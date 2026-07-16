@@ -34,20 +34,22 @@ async function fetchSeries(ticker) {
   const errors = [];
   for (const symbol of candidateSymbols(ticker)) {
     const result = await fetchChart(symbol);
-    if (result) {
-      const timestamps = result.timestamp ?? [];
-      const closes = result.indicators?.quote?.[0]?.close ?? [];
-      console.log(`Resolved ${ticker} -> ${symbol}`);
-      return timestamps
-        .map((t, i) => ({
-          date: new Date(t * 1000).toISOString().slice(0, 10),
-          close: closes[i] != null ? Math.round(closes[i] * 100) / 100 : null,
-        }))
-        .filter((point) => point.close != null);
+    const timestamps = result?.timestamp ?? [];
+    const closes = result?.indicators?.quote?.[0]?.close ?? [];
+    const points = timestamps
+      .map((t, i) => ({
+        date: new Date(t * 1000).toISOString().slice(0, 10),
+        close: closes[i] != null ? Math.round(closes[i] * 100) / 100 : null,
+      }))
+      .filter((point) => point.close != null);
+
+    if (points.length > 0) {
+      console.log(`Resolved ${ticker} -> ${symbol} (${points.length} points)`);
+      return points;
     }
     errors.push(symbol);
   }
-  throw new Error(`Failed to fetch ${ticker}: tried ${errors.join(', ')}, all returned no data`);
+  throw new Error(`Failed to fetch ${ticker}: tried ${errors.join(', ')}, none returned data`);
 }
 
 async function main() {
