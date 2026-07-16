@@ -1,0 +1,210 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>AI大模型股价走势图</title>
+    <!-- 引入 ECharts -->
+    <script src="https://cdn.jsdelivr.net/npm/echarts@5.4.3/dist/echarts.min.js"></script>
+    <style>
+        body {
+            background: #f5f7fa;
+            font-family: Arial, sans-serif;
+            padding: 20px;
+            margin: 0;
+        }
+        .container {
+            max-width: 1100px;
+            margin: 0 auto;
+            background: #fff;
+            border-radius: 12px;
+            box-shadow: 0 4px 20px rgba(0,0,0,0.08);
+            padding: 30px 20px;
+        }
+        h1 {
+            text-align: center;
+            color: #1a1a2e;
+            font-size: 24px;
+            margin-top: 0;
+            margin-bottom: 10px;
+        }
+        .subtitle {
+            text-align: center;
+            color: #888;
+            font-size: 14px;
+            margin-bottom: 25px;
+        }
+        .chart-box {
+            height: 380px;
+            margin-bottom: 30px;
+            border-bottom: 1px solid #eee;
+            padding-bottom: 20px;
+        }
+        .chart-box:last-child {
+            border-bottom: none;
+            margin-bottom: 0;
+            padding-bottom: 0;
+        }
+        .chart-title {
+            font-weight: 600;
+            font-size: 18px;
+            color: #333;
+            margin-bottom: 8px;
+            padding-left: 10px;
+            border-left: 4px solid;
+        }
+        .chart-title.zhipu { border-color: #5470c6; }
+        .chart-title.minimax { border-color: #fac858; }
+        .disclaimer {
+            margin-top: 25px;
+            padding: 15px 20px;
+            background: #fff8e6;
+            border-radius: 8px;
+            color: #b8860b;
+            font-size: 13px;
+            border: 1px solid #f0e0b0;
+            text-align: center;
+        }
+        .note {
+            font-size: 12px;
+            color: #999;
+            text-align: center;
+            margin-top: 10px;
+        }
+    </style>
+</head>
+<body>
+<div class="container">
+    <h1>📈 智谱AI (02513.HK) vs MiniMax (00100.HK)</h1>
+    <div class="subtitle">每日收盘价走势（数据来源：雅虎财经，每个交易日自动更新一次）</div>
+
+    <!-- 智谱AI 图表 -->
+    <div class="chart-title zhipu">智谱AI (02513.HK)</div>
+    <div id="chartZhipu" class="chart-box"></div>
+
+    <!-- MiniMax 图表 -->
+    <div class="chart-title minimax">MiniMax (00100.HK)</div>
+    <div id="chartMinimax" class="chart-box"></div>
+
+    <div class="disclaimer">
+        ⚠️ 免责声明：此图表数据来自雅虎财经的公开行情接口，仅供参考，可能存在延迟或缺口，不构成任何投资建议。
+    </div>
+    <div class="note" id="lastUpdated">数据加载中…</div>
+</div>
+
+<script>
+    (function() {
+        // 初始化 ECharts 的通用配置
+        function initChart(domId, title, color, dataPoints) {
+            const dom = document.getElementById(domId);
+            if (!dom) return;
+            const chart = echarts.init(dom);
+
+            // 提取日期和数值
+            const dates = dataPoints.map(item => item.date);
+            const values = dataPoints.map(item => item.close);
+            const markMax = Math.max(...values);
+            const markMin = Math.min(...values);
+
+            const option = {
+                tooltip: {
+                    trigger: 'axis',
+                    formatter: function(params) {
+                        const p = params[0];
+                        return `<strong>${p.name}</strong><br/>价格：<span style="color:${color};font-weight:bold;">${p.value} 港元</span>`;
+                    }
+                },
+                grid: {
+                    left: '6%',
+                    right: '6%',
+                    bottom: '12%',
+                    top: '8%',
+                    containLabel: true
+                },
+                xAxis: {
+                    type: 'category',
+                    data: dates,
+                    axisLabel: {
+                        rotate: 30,
+                        fontSize: 11,
+                        interval: 0 // 显示全部
+                    },
+                    boundaryGap: false,
+                    axisLine: { lineStyle: { color: '#ddd' } }
+                },
+                yAxis: {
+                    type: 'value',
+                    name: '价格 (港元)',
+                    nameTextStyle: { fontSize: 12, color: '#666' },
+                    splitLine: { lineStyle: { color: '#f0f0f0', type: 'dashed' } },
+                    axisLabel: {
+                        formatter: function(value) {
+                            if (value >= 1000) return (value / 1000) + 'k';
+                            return value;
+                        }
+                    }
+                },
+                series: [{
+                    name: title,
+                    type: 'line',
+                    smooth: true,
+                    symbol: 'circle',
+                    symbolSize: 8,
+                    lineStyle: { width: 3, color: color },
+                    areaStyle: {
+                        color: new echarts.graphic.LinearGradient(0, 0, 0, 1, [
+                            { offset: 0, color: color + '40' },
+                            { offset: 1, color: color + '05' }
+                        ])
+                    },
+                    data: values,
+                    markPoint: {
+                        data: [
+                            { type: 'max', name: '最高', symbolSize: 50 },
+                            { type: 'min', name: '最低', symbolSize: 50 }
+                        ],
+                        label: {
+                            formatter: function(params) {
+                                return params.value + '港元';
+                            },
+                            fontSize: 11,
+                            position: 'top'
+                        }
+                    },
+                    markLine: {
+                        silent: true,
+                        data: [
+                            { yAxis: markMax, label: { formatter: '最高 ' + markMax + '港元', color: '#e74c3c', fontSize: 11 } },
+                            { yAxis: markMin, label: { formatter: '最低 ' + markMin + '港元', color: '#2e86de', fontSize: 11 } }
+                        ],
+                        lineStyle: { type: 'dashed', color: '#999', width: 1 }
+                    }
+                }]
+            };
+
+            chart.setOption(option);
+            // 自适应
+            window.addEventListener('resize', function() { chart.resize(); });
+            return chart;
+        }
+
+        // 加载由 GitHub Actions 定时更新的真实收盘价数据
+        fetch('data/stock-data.json', { cache: 'no-store' })
+            .then(res => res.json())
+            .then(data => {
+                initChart('chartZhipu', '智谱AI 收盘价', '#5470c6', data.zhipu);
+                initChart('chartMinimax', 'MiniMax 收盘价', '#fac858', data.minimax);
+
+                const lastUpdatedEl = document.getElementById('lastUpdated');
+                lastUpdatedEl.textContent = data.lastUpdated
+                    ? `📅 数据最后更新：${new Date(data.lastUpdated).toLocaleString('zh-CN', { timeZone: 'Asia/Hong_Kong' })}（港时）`
+                    : '⏳ 尚未运行自动更新，当前为初始占位数据。';
+            })
+            .catch(err => {
+                document.getElementById('lastUpdated').textContent = '⚠️ 数据加载失败：' + err.message;
+            });
+    })();
+</script>
+
+</body>
+</html>
