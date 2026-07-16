@@ -7,28 +7,47 @@ const TICKERS = {
   minimax: '00100.HK',
 };
 
-async function fetchSeries(ticker) {
-  const url = `https://query1.finance.yahoo.com/v8/finance/chart/${encodeURIComponent(ticker)}?range=1y&interval=1d`;
+// HKEX displays codes zero-padded to 5 digits, but Yahoo Finance tickers use
+// a 4-digit padding (e.g. HKEX "02513" / "00100" -> Yahoo "2513.HK" / "0100.HK").
+// Try a few plausible variants since we can't be 100% sure which one Yahoo indexes.
+function candidateSymbols(ticker) {
+  const match = ticker.match(/^0*(\d+)\.HK$/i);
+  if (!match) return [ticker];
+  const num = match[1];
+  const padded4 = num.padStart(4, '0');
+  return [...new Set([ticker, `${padded4}.HK`, `${num}.HK`])];
+}
+
+async function fetchChart(symbol) {
+  const url = `https://query1.finance.yahoo.com/v8/finance/chart/${encodeURIComponent(symbol)}?range=1y&interval=1d`;
   const res = await fetch(url, {
     headers: { 'User-Agent': 'Mozilla/5.0 (compatible; stock-chart-fetcher/1.0)' },
   });
   if (!res.ok) {
-    throw new Error(`Failed to fetch ${ticker}: HTTP ${res.status}`);
+    return null;
   }
   const json = await res.json();
-  const result = json?.chart?.result?.[0];
-  if (!result) {
-    throw new Error(`No chart data returned for ${ticker}`);
-  }
-  const timestamps = result.timestamp ?? [];
-  const closes = result.indicators?.quote?.[0]?.close ?? [];
+  return json?.chart?.result?.[0] ?? null;
+}
 
-  return timestamps
-    .map((t, i) => ({
-      date: new Date(t * 1000).toISOString().slice(0, 10),
-      close: closes[i] != null ? Math.round(closes[i] * 100) / 100 : null,
-    }))
-    .filter((point) => point.close != null);
+async function fetchSeries(ticker) {
+  const errors = [];
+  for (const symbol of candidateSymbols(ticker)) {
+    const result = await fetchChart(symbol);
+    if (result) {
+      const timestamps = result.timestamp ?? [];
+      const closes = result.indicators?.quote?.[0]?.close ?? [];
+      console.log(`Resolved ${ticker} -> ${symbol}`);
+      return timestamps
+        .map((t, i) => ({
+          date: new Date(t * 1000).toISOString().slice(0, 10),
+          close: closes[i] != null ? Math.round(closes[i] * 100) / 100 : null,
+        }))
+        .filter((point) => point.close != null);
+    }
+    errors.push(symbol);
+  }
+  throw new Error(`Failed to fetch ${ticker}: tried ${errors.join(', ')}, all returned no data`);
 }
 
 async function main() {
